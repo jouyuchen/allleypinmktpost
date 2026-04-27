@@ -41,6 +41,13 @@ h1{font-size:18px;font-weight:900;color:#1B4F9C;margin-bottom:18px}
 .note{font-size:11px;color:#aaa;margin-top:4px}
 .pos-btn{flex:1;padding:7px 4px;border:1.5px solid #e0e0e0;background:white;border-radius:8px;font-family:inherit;font-size:12px;font-weight:700;color:#888;cursor:pointer;transition:all .15s}
 .pos-btn.active{border-color:#1B4F9C;background:#eef2fa;color:#1B4F9C}
+.nudge-btn{width:30px;height:30px;border:none;border-radius:6px;font-family:inherit;font-size:15px;cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;justify-content:center;padding:0;font-weight:700}
+.nudge-btn.h{background:#dbeafe;color:#1B4F9C}
+.nudge-btn.h:hover{background:#1B4F9C;color:white}
+.nudge-btn.v{background:#fce7d6;color:#c05a00}
+.nudge-btn.v:hover{background:#e8792a;color:white}
+.nudge-btn.reset{width:auto;padding:0 12px;background:#f0f0f0;color:#666;font-size:12px;font-weight:700;border-radius:6px}
+.nudge-btn.reset:hover{background:#ddd;color:#333}
 </style>
 </head>
 <body>
@@ -130,6 +137,33 @@ h1{font-size:18px;font-weight:900;color:#1B4F9C;margin-bottom:18px}
       <button type="button" class="pos-btn"        id="pos-center" onclick="setExtraPos('center')">◻ ◼ ◻ 中</button>
       <button type="button" class="pos-btn"        id="pos-right"  onclick="setExtraPos('right')" >◻ ◻ ◼ 右</button>
     </div>
+  </div>
+  <div class="field">
+    <label>位置微調</label>
+    <div style="display:flex;flex-direction:column;gap:6px;margin-top:4px">
+      <div style="display:flex;align-items:center;gap:6px">
+        <span style="font-size:11px;color:#1B4F9C;font-weight:700;width:14px">X</span>
+        <button type="button" class="nudge-btn h" onclick="nudge('x',-1)">←</button>
+        <input type="number" id="extra-off-x" value="0" step="4"
+               style="width:56px;padding:5px 6px;border-radius:6px;border:1.5px solid #e0e0e0;font-family:inherit;font-size:12px;text-align:center"
+               oninput="syncOffset()">
+        <button type="button" class="nudge-btn h" onclick="nudge('x',1)">→</button>
+        <span style="font-size:11px;color:#aaa">px</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <span style="font-size:11px;color:#c05a00;font-weight:700;width:14px">Y</span>
+        <button type="button" class="nudge-btn v" onclick="nudge('y',-1)">↑</button>
+        <input type="number" id="extra-off-y" value="0" step="4"
+               style="width:56px;padding:5px 6px;border-radius:6px;border:1.5px solid #e0e0e0;font-family:inherit;font-size:12px;text-align:center"
+               oninput="syncOffset()">
+        <button type="button" class="nudge-btn v" onclick="nudge('y',1)">↓</button>
+        <span style="font-size:11px;color:#aaa">px</span>
+      </div>
+      <div>
+        <button type="button" class="nudge-btn reset" onclick="resetOffset()">reset</button>
+      </div>
+    </div>
+    <p class="note">正值往右／往下；箭頭每步 4px</p>
   </div>
 
   <button class="dl-btn" id="dl-btn" onclick="download()">⬇ 下載 PNG（1040px × 1040px）</button>
@@ -475,11 +509,29 @@ buildDayRows();
 
 // ── Extra text ──
 let extraPos='left';
+let extraOffX=0, extraOffY=0;
+
 function setExtraPos(p){
   extraPos=p;
   ['left','center','right'].forEach(k=>{
     document.getElementById('pos-'+k).classList.toggle('active',k===p);
   });
+  if(window._cvs)generate();
+}
+function nudge(axis,dir){
+  if(axis==='x'){extraOffX+=dir*4;document.getElementById('extra-off-x').value=extraOffX;}
+  else          {extraOffY+=dir*4;document.getElementById('extra-off-y').value=extraOffY;}
+  if(window._cvs)generate();
+}
+function syncOffset(){
+  extraOffX=parseInt(document.getElementById('extra-off-x').value)||0;
+  extraOffY=parseInt(document.getElementById('extra-off-y').value)||0;
+  if(window._cvs)generate();
+}
+function resetOffset(){
+  extraOffX=0;extraOffY=0;
+  document.getElementById('extra-off-x').value=0;
+  document.getElementById('extra-off-y').value=0;
   if(window._cvs)generate();
 }
 function drawExtraText(ctx,cardBottomY){
@@ -490,7 +542,7 @@ function drawExtraText(ctx,cardBottomY){
   sf(ctx,30,'700','#1B4F9C');
   ctx.textAlign=align;
   ctx.textBaseline='top';
-  ctx.fillText(txt,x,cardBottomY+25);
+  ctx.fillText(txt, x+extraOffX, cardBottomY+25+extraOffY);
 }
 
 // ── Canvas helpers ──
@@ -777,7 +829,7 @@ async function generate(){
   const bCards=tpl==='C'?[{date:document.getElementById('c1-date').value,type:document.getElementById('c1-type').value,time:document.getElementById('c1-time').value},{date:document.getElementById('c2-date').value,type:document.getElementById('c2-type').value,time:document.getElementById('c2-time').value}]:[];
   const bp=window._bParams||{};
   const extraTxt=(document.getElementById('extra-text').value||'').trim();
-  window._lastParams={tplX:tpl,t1,t2,ws,statuses,cards:bCards,csTime:bp.csTime||null,ceTime:bp.ceTime||null,opTime:bp.opTime||null,extraTxt,extraPos};
+  window._lastParams={tplX:tpl,t1,t2,ws,statuses,cards:bCards,csTime:bp.csTime||null,ceTime:bp.ceTime||null,opTime:bp.opTime||null,extraTxt,extraPos,extraOffX,extraOffY};
 }
 
 function download(){
@@ -895,7 +947,8 @@ async function downloadSVG(){
     const posMap={left:{x:80,anchor:'start'},center:{x:520,anchor:'middle'},right:{x:960,anchor:'end'}};
     const {x,anchor}=(posMap[lp.extraPos]||posMap.left);
     const cbY=lp.tplX==='A'?659:lp.tplX==='B'?690:704;
-    body+=`<text x="${x}" y="${cbY+49}" font-size="30" font-weight="700" fill="#1B4F9C" text-anchor="${anchor}" font-family="'Noto Sans TC',sans-serif">${escSV(lp.extraTxt)}</text>`;
+    const ex=(lp.extraOffX||0), ey=(lp.extraOffY||0);
+    body+=`<text x="${x+ex}" y="${cbY+49+ey}" font-size="30" font-weight="700" fill="#1B4F9C" text-anchor="${anchor}" font-family="'Noto Sans TC',sans-serif">${escSV(lp.extraTxt)}</text>`;
   }
   const defs='<defs><style><![CDATA[@import url(\'https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap\');]]></style></defs>';
   const svgStr='<?xml version="1.0" encoding="UTF-8"?><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1040" height="1040" viewBox="0 0 1040 1040">'+defs+body+'</svg>';
