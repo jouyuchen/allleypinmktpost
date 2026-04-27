@@ -31,8 +31,6 @@ h1{font-size:18px;font-weight:900;color:#1B4F9C;margin-bottom:18px}
 .c-slot label{font-size:11px;font-weight:700;color:#888;display:block;margin-bottom:3px}
 .c-slot input,.c-slot select{width:100%;padding:7px 9px;border-radius:6px;border:1.5px solid #e0e0e0;font-family:inherit;font-size:13px;background:white}
 .c-slots{display:flex;flex-direction:column;gap:8px}
-.gen-btn{width:100%;padding:12px;background:#1B4F9C;color:white;border:none;border-radius:10px;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;margin-top:12px}
-.gen-btn:hover{background:#154080}
 .dl-btn{width:100%;padding:10px;border:2px solid #1B4F9C;color:#1B4F9C;background:transparent;border-radius:10px;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;margin-top:8px;display:none}
 .dl-btn:hover{background:#1B4F9C;color:white}
 .preview-wrap{background:white;border-radius:14px;padding:18px;box-shadow:0 2px 10px rgba(0,0,0,.07);position:sticky;top:20px}
@@ -41,6 +39,8 @@ h1{font-size:18px;font-weight:900;color:#1B4F9C;margin-bottom:18px}
 #canvas-wrap canvas{width:100%!important;height:100%!important;display:block}
 .hint{color:#bbb;font-size:13px}
 .note{font-size:11px;color:#aaa;margin-top:4px}
+.pos-btn{flex:1;padding:7px 4px;border:1.5px solid #e0e0e0;background:white;border-radius:8px;font-family:inherit;font-size:12px;font-weight:700;color:#888;cursor:pointer;transition:all .15s}
+.pos-btn.active{border-color:#1B4F9C;background:#eef2fa;color:#1B4F9C}
 </style>
 </head>
 <body>
@@ -118,14 +118,27 @@ h1{font-size:18px;font-weight:900;color:#1B4F9C;margin-bottom:18px}
     </div>
   </div>
 
-  <button class="gen-btn" onclick="generate()">▶ 產生預覽</button>
+  <div class="sec">附加文字</div>
+  <div class="field">
+    <label>文字內容（選填）</label>
+    <input type="text" id="extra-text" placeholder="例：如需協助請聯繫 LINE 客服">
+  </div>
+  <div class="field">
+    <label>擺放位置</label>
+    <div style="display:flex;gap:6px;margin-top:4px">
+      <button type="button" class="pos-btn active" id="pos-left"   onclick="setExtraPos('left')"  >◼ ◻ ◻ 左</button>
+      <button type="button" class="pos-btn"        id="pos-center" onclick="setExtraPos('center')">◻ ◼ ◻ 中</button>
+      <button type="button" class="pos-btn"        id="pos-right"  onclick="setExtraPos('right')" >◻ ◻ ◼ 右</button>
+    </div>
+  </div>
+
   <button class="dl-btn" id="dl-btn" onclick="download()">⬇ 下載 PNG（1040px × 1040px）</button>
   <button class="dl-btn" id="dl-svg-btn" onclick="downloadSVG()" style="display:none">⬇ 下載 SVG（1040px × 1040px）</button>
 </div>
 
 <div class="preview-wrap">
   <div class="preview-label">預覽</div>
-  <div id="canvas-wrap"><div class="hint">填入資訊後點擊「產生預覽」</div></div>
+  <div id="canvas-wrap"></div>
 </div>
 </div>
 
@@ -460,6 +473,26 @@ document.getElementById('week-start').addEventListener('change',function(){
 });
 buildDayRows();
 
+// ── Extra text ──
+let extraPos='left';
+function setExtraPos(p){
+  extraPos=p;
+  ['left','center','right'].forEach(k=>{
+    document.getElementById('pos-'+k).classList.toggle('active',k===p);
+  });
+  if(window._cvs)generate();
+}
+function drawExtraText(ctx,cardBottomY){
+  const txt=(document.getElementById('extra-text').value||'').trim();
+  if(!txt)return;
+  const posMap={left:{x:80,align:'left'},center:{x:520,align:'center'},right:{x:960,align:'right'}};
+  const {x,align}=posMap[extraPos];
+  sf(ctx,30,'700','#1B4F9C');
+  ctx.textAlign=align;
+  ctx.textBaseline='top';
+  ctx.fillText(txt,x,cardBottomY+25);
+}
+
 // ── Canvas helpers ──
 function circ(ctx,cx,cy,r,f){ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.fillStyle=f;ctx.fill();}
 function rrect(ctx,x,y,w,h,r,f){
@@ -654,16 +687,13 @@ function drawC(ctx,cards){
     if(isOpen){
       sf(ctx,47,'900','#4CAF72');ctx.fillText('正常值班',cx,CY+295);
     }else{
-      // Break at ~ or ～
       const timeStr=card.time||'';
-      const hasBreak=timeStr.includes('~')||timeStr.includes('～');
       sf(ctx,47,'900','#888888');
-      if(timeStr&&hasBreak){
+      if(timeStr){
         ctx.fillText(timeStr,cx,CY+270);
         ctx.fillText('暫停服務',cx,CY+330);
       }else{
-        const txt=timeStr?timeStr+'暫停服務':'暫停服務';
-        ctx.fillText(txt,cx,CY+295);
+        ctx.fillText('暫停服務',cx,CY+295);
       }
     }
   });
@@ -737,13 +767,17 @@ async function generate(){
     drawC(ctx,cards);
   }
 
+  const cardBottomY = tpl==='A' ? 659 : tpl==='B' ? 690 : 704;
+  drawExtraText(ctx,cardBottomY);
+
   document.getElementById('dl-btn').style.display='block';
   document.getElementById('dl-svg-btn').style.display='block';
   window._cvs=canvas;
   // Store params for editable SVG
   const bCards=tpl==='C'?[{date:document.getElementById('c1-date').value,type:document.getElementById('c1-type').value,time:document.getElementById('c1-time').value},{date:document.getElementById('c2-date').value,type:document.getElementById('c2-type').value,time:document.getElementById('c2-time').value}]:[];
   const bp=window._bParams||{};
-  window._lastParams={tplX:tpl,t1,t2,ws,statuses,cards:bCards,csTime:bp.csTime||null,ceTime:bp.ceTime||null,opTime:bp.opTime||null};
+  const extraTxt=(document.getElementById('extra-text').value||'').trim();
+  window._lastParams={tplX:tpl,t1,t2,ws,statuses,cards:bCards,csTime:bp.csTime||null,ceTime:bp.ceTime||null,opTime:bp.opTime||null,extraTxt,extraPos};
 }
 
 function download(){
@@ -841,10 +875,10 @@ function svgC_gen(cards,t1,t2){
     s+=svgRr(bx,by,bw,bh,8,'#1B4F9C');
     s+=svgTxt(dow,bx+bw/2,by+bh/2,20,'700','white','middle',true);
     s+=svgCi(cx,DOT_Y,10,isOpen?'#4CAF72':'#888888');
-    const timeStr=card.time||'',hasBreak=timeStr.includes('~')||timeStr.includes('～');
+    const timeStr=card.time||'';
     if(isOpen)s+=svgTxt('正常值班',cx,CY+295,47,'900','#4CAF72');
-    else if(timeStr&&hasBreak){s+=svgTxt(timeStr,cx,CY+270,47,'900','#888888');s+=svgTxt('暫停服務',cx,CY+330,47,'900','#888888');}
-    else s+=svgTxt(timeStr?timeStr+'暫停服務':'暫停服務',cx,CY+295,47,'900','#888888');
+    else if(timeStr){s+=svgTxt(timeStr,cx,CY+270,47,'900','#888888');s+=svgTxt('暫停服務',cx,CY+330,47,'900','#888888');}
+    else s+=svgTxt('暫停服務',cx,CY+295,47,'900','#888888');
   });
   return s;
 }
@@ -857,6 +891,12 @@ async function downloadSVG(){
   if(lp.tplX==='A')body+=svgA_gen(lp.ws,lp.statuses,lp.t1,lp.t2);
   else if(lp.tplX==='B')body+=svgB_gen(lp.ws,lp.csTime,lp.ceTime,lp.opTime,lp.t1);
   else body+=svgC_gen(lp.cards,lp.t1,lp.t2);
+  if(lp.extraTxt){
+    const posMap={left:{x:80,anchor:'start'},center:{x:520,anchor:'middle'},right:{x:960,anchor:'end'}};
+    const {x,anchor}=(posMap[lp.extraPos]||posMap.left);
+    const cbY=lp.tplX==='A'?659:lp.tplX==='B'?690:704;
+    body+=`<text x="${x}" y="${cbY+49}" font-size="30" font-weight="700" fill="#1B4F9C" text-anchor="${anchor}" font-family="'Noto Sans TC',sans-serif">${escSV(lp.extraTxt)}</text>`;
+  }
   const defs='<defs><style><![CDATA[@import url(\'https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap\');]]></style></defs>';
   const svgStr='<?xml version="1.0" encoding="UTF-8"?><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1040" height="1040" viewBox="0 0 1040 1040">'+defs+body+'</svg>';
   const blob=new Blob([svgStr],{type:'image/svg+xml'});
