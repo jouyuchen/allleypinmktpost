@@ -127,8 +127,18 @@ h1{font-size:18px;font-weight:900;color:#1B4F9C;margin-bottom:18px}
 
   <div class="sec">附加文字</div>
   <div class="field">
-    <label>文字內容（選填）</label>
-    <input type="text" id="extra-text" placeholder="例：如需協助請聯繫 LINE 客服">
+    <label>文字內容（選填，Enter 可換行）</label>
+    <textarea id="extra-text" rows="3" placeholder="例：如需協助請聯繫 LINE 客服"
+      style="width:100%;padding:7px 9px;border-radius:8px;border:1.5px solid #e0e0e0;font-family:inherit;font-size:13px;resize:vertical;line-height:1.5"
+      oninput="if(window._cvs)generate()"></textarea>
+  </div>
+  <div class="field">
+    <label>文字對齊</label>
+    <div style="display:flex;gap:6px;margin-top:4px">
+      <button type="button" class="pos-btn active" id="align-left"   onclick="setExtraAlign('left')"  >≡ 齊左</button>
+      <button type="button" class="pos-btn"        id="align-center" onclick="setExtraAlign('center')">≡ 置中</button>
+      <button type="button" class="pos-btn"        id="align-right"  onclick="setExtraAlign('right')" >≡ 齊右</button>
+    </div>
   </div>
   <div class="field">
     <label>擺放位置</label>
@@ -509,12 +519,20 @@ buildDayRows();
 
 // ── Extra text ──
 let extraPos='left';
+let extraAlign='left';
 let extraOffX=0, extraOffY=0;
 
 function setExtraPos(p){
   extraPos=p;
   ['left','center','right'].forEach(k=>{
     document.getElementById('pos-'+k).classList.toggle('active',k===p);
+  });
+  if(window._cvs)generate();
+}
+function setExtraAlign(a){
+  extraAlign=a;
+  ['left','center','right'].forEach(k=>{
+    document.getElementById('align-'+k).classList.toggle('active',k===a);
   });
   if(window._cvs)generate();
 }
@@ -537,12 +555,18 @@ function resetOffset(){
 function drawExtraText(ctx,cardBottomY){
   const txt=(document.getElementById('extra-text').value||'').trim();
   if(!txt)return;
-  const posMap={left:{x:80,align:'left'},center:{x:520,align:'center'},right:{x:960,align:'right'}};
-  const {x,align}=posMap[extraPos];
+  const posMap={left:{x:80},center:{x:520},right:{x:960}};
+  const {x}=posMap[extraPos];
+  const lines=txt.split('\n');
+  const lineH=48;
   sf(ctx,30,'700','#1B4F9C');
-  ctx.textAlign=align;
+  ctx.textAlign=extraAlign;
   ctx.textBaseline='top';
-  ctx.fillText(txt, x+extraOffX, cardBottomY+25+extraOffY);
+  ctx.letterSpacing='1.2px';
+  lines.forEach((line,i)=>{
+    ctx.fillText(line, x+extraOffX, cardBottomY+25+extraOffY+i*lineH);
+  });
+  ctx.letterSpacing='0px';
 }
 
 // ── Canvas helpers ──
@@ -829,7 +853,7 @@ async function generate(){
   const bCards=tpl==='C'?[{date:document.getElementById('c1-date').value,type:document.getElementById('c1-type').value,time:document.getElementById('c1-time').value},{date:document.getElementById('c2-date').value,type:document.getElementById('c2-type').value,time:document.getElementById('c2-time').value}]:[];
   const bp=window._bParams||{};
   const extraTxt=(document.getElementById('extra-text').value||'').trim();
-  window._lastParams={tplX:tpl,t1,t2,ws,statuses,cards:bCards,csTime:bp.csTime||null,ceTime:bp.ceTime||null,opTime:bp.opTime||null,extraTxt,extraPos,extraOffX,extraOffY};
+  window._lastParams={tplX:tpl,t1,t2,ws,statuses,cards:bCards,csTime:bp.csTime||null,ceTime:bp.ceTime||null,opTime:bp.opTime||null,extraTxt,extraPos,extraAlign,extraOffX,extraOffY};
 }
 
 function download(){
@@ -944,11 +968,17 @@ async function downloadSVG(){
   else if(lp.tplX==='B')body+=svgB_gen(lp.ws,lp.csTime,lp.ceTime,lp.opTime,lp.t1);
   else body+=svgC_gen(lp.cards,lp.t1,lp.t2);
   if(lp.extraTxt){
-    const posMap={left:{x:80,anchor:'start'},center:{x:520,anchor:'middle'},right:{x:960,anchor:'end'}};
-    const {x,anchor}=(posMap[lp.extraPos]||posMap.left);
+    const posMap={left:{x:80},center:{x:520},right:{x:960}};
+    const anchorMap={left:'start',center:'middle',right:'end'};
+    const {x}=(posMap[lp.extraPos]||posMap.left);
+    const anchor=anchorMap[lp.extraAlign||'left'];
     const cbY=lp.tplX==='A'?659:lp.tplX==='B'?690:704;
     const ex=(lp.extraOffX||0), ey=(lp.extraOffY||0);
-    body+=`<text x="${x+ex}" y="${cbY+49+ey}" font-size="30" font-weight="700" fill="#1B4F9C" text-anchor="${anchor}" font-family="'Noto Sans TC',sans-serif">${escSV(lp.extraTxt)}</text>`;
+    const lines=lp.extraTxt.split('\n');
+    const lineH=48;
+    const baseY=cbY+49+ey;
+    let tspans=lines.map((ln,i)=>`<tspan x="${x+ex}" dy="${i===0?0:lineH}">${escSV(ln)}</tspan>`).join('');
+    body+=`<text x="${x+ex}" y="${baseY}" font-size="30" font-weight="700" fill="#1B4F9C" text-anchor="${anchor}" letter-spacing="1.2" font-family="'Noto Sans TC',sans-serif">${tspans}</text>`;
   }
   const defs='<defs><style><![CDATA[@import url(\'https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap\');]]></style></defs>';
   const svgStr='<?xml version="1.0" encoding="UTF-8"?><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1040" height="1040" viewBox="0 0 1040 1040">'+defs+body+'</svg>';
@@ -999,7 +1029,7 @@ document.getElementById('c1-date').addEventListener('change',function(){
   function autoGen(){ clearTimeout(_t); _t = setTimeout(generate, 120); }
 
   // 3. Wire all static inputs / selects (except file)
-  document.querySelectorAll('input:not([type=file]), select').forEach(el=>{
+  document.querySelectorAll('input:not([type=file]), select, textarea').forEach(el=>{
     el.addEventListener('input',  autoGen);
     el.addEventListener('change', autoGen);
   });
