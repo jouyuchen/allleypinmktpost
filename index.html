@@ -890,6 +890,38 @@ document.getElementById('c1-date').addEventListener('change',function(){
   if(!this.value)return;
   document.getElementById('c2-date').value=addDays(this.value,1);
 });
+
+// ── Real-time preview patch ──────────────────────────────────────
+(function(){
+  // Cache images so base64 decoding only happens once per src
+  const _origLoad = loadImg;
+  const _cache = {};
+  window.loadImg = function(src){
+    if(!_cache[src]) _cache[src] = _origLoad(src);
+    return _cache[src];
+  };
+
+  // Debounced generate
+  let _t;
+  function autoGen(){ clearTimeout(_t); _t = setTimeout(generate, 120); }
+
+  // Wire all inputs / selects (except file input)
+  document.querySelectorAll('input:not([type=file]), select').forEach(el=>{
+    el.addEventListener('input',  autoGen);
+    el.addEventListener('change', autoGen);
+  });
+
+  // Also re-render when template buttons are clicked
+  const _origSetTpl = window.setTpl;
+  window.setTpl = function(t,el){ _origSetTpl(t,el); autoGen(); };
+
+  // Re-render when custom BG is loaded
+  const _origLoadCustomBg = window.loadCustomBg;
+  window.loadCustomBg = function(e){ _origLoadCustomBg(e); setTimeout(generate,200); };
+
+  // Initial render
+  autoGen();
+})();
 </script>
 </body>
 </html>
