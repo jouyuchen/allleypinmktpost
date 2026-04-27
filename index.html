@@ -893,7 +893,7 @@ document.getElementById('c1-date').addEventListener('change',function(){
 
 // ── Real-time preview patch ──────────────────────────────────────
 (function(){
-  // Cache images so base64 decoding only happens once per src
+  // 1. Cache images so base64 decoding only happens once per src
   const _origLoad = loadImg;
   const _cache = {};
   window.loadImg = function(src){
@@ -901,25 +901,45 @@ document.getElementById('c1-date').addEventListener('change',function(){
     return _cache[src];
   };
 
-  // Debounced generate
+  // 2. Debounced generate
   let _t;
   function autoGen(){ clearTimeout(_t); _t = setTimeout(generate, 120); }
 
-  // Wire all inputs / selects (except file input)
+  // 3. Wire all static inputs / selects (except file)
   document.querySelectorAll('input:not([type=file]), select').forEach(el=>{
     el.addEventListener('input',  autoGen);
     el.addEventListener('change', autoGen);
   });
 
-  // Also re-render when template buttons are clicked
+  // 4. Event delegation for dynamically built day-rows (版型A)
+  document.getElementById('day-rows').addEventListener('change', autoGen);
+
+  // 5. Re-render when template buttons are clicked
   const _origSetTpl = window.setTpl;
   window.setTpl = function(t,el){ _origSetTpl(t,el); autoGen(); };
 
-  // Re-render when custom BG is loaded
+  // 6. Re-render after custom BG is loaded
   const _origLoadCustomBg = window.loadCustomBg;
   window.loadCustomBg = function(e){ _origLoadCustomBg(e); setTimeout(generate,200); };
 
-  // Initial render
+  // 7. Default today's dates ─────────────────────────────────────
+  const _today = new Date();
+  // Version C: c1-date = today, c2-date = tomorrow
+  const c1El = document.getElementById('c1-date');
+  const c2El = document.getElementById('c2-date');
+  if(c1El) c1El.value = localDateStr(_today);
+  if(c2El) c2El.value = addDays(localDateStr(_today), 1);
+
+  // week-start (A/B): this week's Sunday
+  const wsEl = document.getElementById('week-start');
+  if(wsEl){
+    const sun = new Date(_today);
+    sun.setDate(_today.getDate() - _today.getDay());
+    wsEl.value = localDateStr(sun);
+    buildDayRows();
+  }
+
+  // 8. Initial render
   autoGen();
 })();
 </script>
